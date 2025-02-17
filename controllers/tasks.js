@@ -1,24 +1,25 @@
 const mongoose = require('mongoose');
 const Task = require('../models/Task');
 const asyncWrapper = require('../middleware/async');
+const { createCustomError } = require('../errors/custom-error');
 
 const getTasks = asyncWrapper(async (req, res) => {
   const tasks = await Task.find({});
-  if (!tasks) {
-    return res.status(404).json({
-      success: false,
-      message: 'No tasks exist'
-    });
+  if (!tasks || tasks.length === 0) {
+    return next(createCustomError({
+      statusCode: 404,
+      message: 'No tasks exist',
+    }));
   }
   res.status(200).json({
     success: true,
-    message: 'Success',
     tasks
   });
 })
 
 const createTask = asyncWrapper(async (req, res) => {
   const { name, completed } = req.body;
+
   const newTask = await Task.create({
     name: name,
     completed: completed
@@ -34,16 +35,18 @@ const getTaskById = asyncWrapper(async (req, res, next) => {
   const { id } = req.params;
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    const error = new Error('Invalid ID format');
-    error.status = 400;
-    return next(error);
+    return next(createCustomError({
+      statusCode: 400,
+      message: 'Invalid ID format',
+    }));
   }
 
   const task = await Task.findById(id);
   if (!task) {
-    const error = new Error('Task with specified ID not found');
-    error.status = 404;
-    return next(error);
+    return next(createCustomError({
+      statusCode: 404,
+      message: 'Task with specified ID not found',
+    }));
   }
   res.status(200).json({
     success: true,
@@ -53,20 +56,20 @@ const getTaskById = asyncWrapper(async (req, res, next) => {
 
 // needs to update code to use errorHandlerMiddleware like above
 
-const updateTask = asyncWrapper(async (req, res) => {
+const updateTask = asyncWrapper(async (req, res, next) => {
   const { id } = req.params;
   const { newName, completed } = req.body;
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({
-      success: false,
-      message: 'Invalid ID format',
-    });
+    return next(createCustomError({
+      statusCode: 400,
+      message: 'Invalid ID format'
+    }));
   }
 
   const updatedTask = {};
   if (newName) updatedTask.name = newName;
-  if (completed !== 'undefined') updatedTask.completed = completed;
+  if (completed !== undefined) updatedTask.completed = completed;
 
   const options = {
     new: true,
@@ -76,10 +79,10 @@ const updateTask = asyncWrapper(async (req, res) => {
   const task = await Task.findByIdAndUpdate(id, updatedTask, options);
 
   if (!task) {
-    return res.status(404).json({
-      success: false,
-      message: 'Cannot update task, task with specified ID does not exist',
-    });
+    return next(createCustomError({
+      statusCode: 404,
+      message: 'Cannot update task, Task with specified ID does not exist',
+    }));
   }
 
   res.status(200).json({
@@ -89,20 +92,20 @@ const updateTask = asyncWrapper(async (req, res) => {
   });
 })
 
-const deleteTask = asyncWrapper(async (req, res) => {
+const deleteTask = asyncWrapper(async (req, res, next) => {
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({
-      success: false,
+    return next(createCustomError({
+      statusCode: 400,
       message: 'Invalid ID format',
-    })
+    }));
   }
   const task = await Task.findByIdAndDelete(id);
   if (!task) {
-    return res.status(404).json({
-      success: false,
-      message: 'Task with the specified ID not found',
-    });
+    return next(createCustomError({
+      statusCode: 404,
+      message: 'Cannot delete task, Task with the specified ID not found'
+    }));
   }
   res.status(200).json({
     success: true,
